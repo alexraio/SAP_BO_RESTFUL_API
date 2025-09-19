@@ -3,12 +3,12 @@
 
 NAME:        
 DESCRIPTION: Class to manage the connection to the Business Objects platform and perform operations on Webi documents.
-AUTHOR:      Ballarin, Alessio (Volkswagen Group Services GmbH)
+AUTHOR:      Ballarin, Alessio
 VERSION:     0.1
 CREATED ON:  
 CHANGED AT:  
 CHANGES:     
-0.1 -  - Initial version - Alessio Ballarin, Volkswagen Group Services GmbH
+0.1 -  - Initial version - Alessio Ballarin
 
 ------------------------------------------------------
 '''
