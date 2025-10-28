@@ -329,6 +329,35 @@ class BOESDKParser:
         except requests.exceptions.RequestException as e:
             print(f"Error getting Data Providers: {e}")
             return []
+    
+    def get_dp_details(self, webi_doc_id, dp_id):
+        """
+        Gets details of a specific Data Provider.
+
+        Args:
+            webi_doc_id (str): ID of the Webi document.
+            dp_id (str): ID of the Data Provider.
+
+        Returns:
+            dict: A dictionary containing Data Provider details.
+                  Example: {'id': 'DP0', 'dataSourceId': '809161', 'dataSourceType': 'unx', 'dataSourceName': 'eFashion'}
+                  Returns None if there's an error.
+        """
+        url = f"{self.webi_url}/documents/{webi_doc_id}/dataproviders/{dp_id}"
+        try:
+            resp = self.session.get(url, headers=self.headers, verify=False)
+            resp.raise_for_status()
+            j_response = resp.json()
+            dp_data = j_response['dataprovider']
+            return {
+                'id': dp_data['id'],
+                'dataSourceId': dp_data['dataSourceId'],
+                'dataSourceType': dp_data['dataSourceType'],
+                'dataSourceName': dp_data['dataSourceName']
+            }
+        except requests.exceptions.RequestException as e:
+            print(f"Error getting Data Provider details: {e}")
+            return None
 
     def purge_dp(self, webi_doc_id, dp_id):
         """
@@ -402,7 +431,7 @@ class BOESDKParser:
             
             
     # @Alessio - Would be better to check for 404 status code end return 404 instead of None. 
-    # +Than I can check for 404 in the colling script. This is better becose 404 tell that the document is not a webi but a crystal.
+    # +Than I can check for 404 in the colling script. This is better because 404 tell that the document is not a webi but a crystal.
     def get_doc_status(self, webi_doc_id):
         """
         Gets document status and returns it as a dictionary.
