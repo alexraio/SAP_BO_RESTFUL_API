@@ -243,6 +243,28 @@ class BOESDKParser:
         else:
             raise Exception("Could not retrieve the universe. Check the Universe ID again")
 
+    
+    def delete_webi_doc(self, webi_doc_id):
+        """
+        Deletes a Webi document.
+
+        Args:
+            webi_doc_id (str): ID of the Webi document to delete.
+
+        Returns:
+            bool: True if the deletion is successful, False otherwise.
+        """
+        url = f"{self.webi_url}/documents/{webi_doc_id}"
+        try:
+            resp = self.session.delete(url, headers=self.headers, verify=False)
+            resp.raise_for_status()
+            print(f'Deleted Webi document {webi_doc_id} - Status Code: {resp.status_code}')
+            return True
+        except requests.exceptions.RequestException as e:
+            print(f"Error deleting Webi document: {e}")
+            return False
+
+
     def get_univ_related_conn_id(self, universe_id):
         """
         Gets the connection ID of a universe.
@@ -407,7 +429,7 @@ class BOESDKParser:
         Gets document information and returns it as a dictionary.
 
         Args:
-            webi_doc_id (str): ID of the Webi document.
+            webi_doc_id (str): ID of the Webi document. 
 
         Returns:
             dict: A dictionary containing document details.
