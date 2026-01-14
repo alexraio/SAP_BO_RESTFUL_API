@@ -362,7 +362,8 @@ class BOESDKParser:
 
         Returns:
             dict: A dictionary containing Data Provider details.
-                  Example: {'id': 'DP0', 'dataSourceId': '809161', 'dataSourceType': 'unx', 'dataSourceName': 'eFashion'}
+                  Example: {'id': 'DP0', 'dataSourceId': '809161', 'dataSourceType': 'unx', 
+                           'dataSourceName': 'eFashion', 'expressions': [{'id': 'DP0.DO15', 'name': 'Lines'}, ...]}
                   Returns None if there's an error.
         """
         url = f"{self.webi_url}/documents/{webi_doc_id}/dataproviders/{dp_id}"
@@ -371,11 +372,22 @@ class BOESDKParser:
             resp.raise_for_status()
             j_response = resp.json()
             dp_data = j_response['dataprovider']
+            
+            # Extract expressions from dictionary
+            expressions = []
+            if 'dictionary' in dp_data and 'expression' in dp_data['dictionary']:
+                for expr in dp_data['dictionary']['expression']:
+                    expressions.append({
+                        'id': expr.get('id'),
+                        'name': expr.get('name')
+                    })
+            
             return {
                 'id': dp_data['id'],
                 'dataSourceId': dp_data['dataSourceId'],
                 'dataSourceType': dp_data['dataSourceType'],
-                'dataSourceName': dp_data['dataSourceName']
+                'dataSourceName': dp_data['dataSourceName'],
+                'expressions': expressions
             }
         except requests.exceptions.RequestException as e:
             print(f"Error getting Data Provider details: {e}")
@@ -487,4 +499,4 @@ class BOESDKParser:
                     return None
             else:
                 print(f"Error getting document info: {e}")
-                return None    
+                return None
