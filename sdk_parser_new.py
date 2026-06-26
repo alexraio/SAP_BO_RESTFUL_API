@@ -500,3 +500,28 @@ class BOESDKParser:
             else:
                 print(f"Error getting document info: {e}")
                 return None
+
+    def get_universe_by_name(self, universe_name):
+        """
+        Queries the CMS to retrieve the details of a universe by its name.
+
+        Args:
+            universe_name (str): Name of the universe.
+
+        Returns:
+            dict: The first matching entry dictionary containing SI_ID, SI_NAME,
+                  SI_PARENTID, and SI_COREUNIVERSE, or None if not found.
+        """
+        url = f"{self.query_url}/cmsquery?page=1&pagesize=50000"
+        payload = {
+            "query": f"SELECT SI_ID, SI_NAME, SI_PARENTID, SI_COREUNIVERSE FROM CI_AppObjects WHERE si_name = '{universe_name}' AND si_kind = 'Universe'"
+        }
+        resp = self.session.post(url, json=payload, headers=self.headers, verify=False)
+        if resp.status_code == 200:
+            j_resp = resp.json()
+            if 'entries' in j_resp and len(j_resp['entries']) > 0:
+                return j_resp['entries'][0]
+            return None
+        else:
+            raise Exception(f"CMS query failed: {resp.status_code} - {resp.text}")
+
