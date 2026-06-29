@@ -9,6 +9,8 @@ CREATED ON:
 CHANGED AT:  
 CHANGES:     
 0.1 -  - Initial version - Alessio Ballarin
+0.2 - 29/06/2026 - Added support to retrieve core universe IDs from 
+               webi documents - Alessio Ballarin
 
 ------------------------------------------------------
 '''
@@ -17,6 +19,7 @@ import requests
 import json
 import logging
 import os
+import re
 import datetime
 
 
@@ -501,26 +504,50 @@ class BOESDKParser:
                 print(f"Error getting document info: {e}")
                 return None
 
-    def get_universe_by_name(self, universe_name):
+    def get_core_universe_by_name(self, universe_name):
         """
         Queries the CMS to retrieve the details of a universe by its name.
+
+        Auto-detects UNV vs UNX from the supplied name:
+          * name ending in '.unx' (case-insensitive, trimmed) -> UNX (DSL.MetaDataFile)
+          * otherwise                                       -> UNV (Universe)
+
+        The result is normalized so the linked-core field is always surfaced
+        under SI_COREUNIVERSE, regardless of source column.
 
         Args:
             universe_name (str): Name of the universe.
 
         Returns:
-            dict: The first matching entry dictionary containing SI_ID, SI_NAME,
-                  SI_PARENTID, and SI_COREUNIVERSE, or None if not found.
+            dict: The first matching entry with SI_ID, SI_NAME, SI_PARENTID,
+                  and SI_COREUNIVERSE. Returns None if no match.
         """
+        name = universe_name.strip()
+        is_unx = bool(re.search(r"\.unx$", name, re.IGNORECASE))
+
+        if is_unx:
+            kind, core_col = "DSL.MetaDataFile", "SI_DSL_COREUNIVERSE"
+        else:
+            kind, core_col = "Universe", "SI_COREUNIVERSE"
+
         url = f"{self.query_url}/cmsquery?page=1&pagesize=50000"
         payload = {
-            "query": f"SELECT SI_ID, SI_NAME, SI_PARENTID, SI_COREUNIVERSE FROM CI_AppObjects WHERE si_name = '{universe_name}' AND si_kind = 'Universe'"
+            "query": (
+                f"SELECT SI_ID, SI_NAME, SI_PARENTID, {core_col} "
+                f"FROM CI_AppObjects WHERE si_name = '{name}' "
+                f"AND si_kind = '{kind}'"
+            )
         }
         resp = self.session.post(url, json=payload, headers=self.headers, verify=False)
         if resp.status_code == 200:
             j_resp = resp.json()
-            if 'entries' in j_resp and len(j_resp['entries']) > 0:
-                return j_resp['entries'][0]
+            if 'entries' in j_resp and j_resp['entries']:
+                entry = j_resp['entries'][0]
+                if core_col != "SI_COREUNIVERSE":
+                    entry["SI_COREUNIVERSE"] = entry.pop(core_col, {})
+                else:
+                    entry.setdefault("SI_COREUNIVERSE", {})
+                return entry
             return None
         else:
             raise Exception(f"CMS query failed: {resp.status_code} - {resp.text}")
