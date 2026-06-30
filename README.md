@@ -119,7 +119,6 @@ SAP_BO_RESTFUL_API/
 ├── sdk_parser_new.py      # Main SDK class (BOESDKParser)
 ├── rest_helper.py         # Logging utilities
 ├── logger_function.py     # Custom logging functions
-├── sdk_parser.py_bak      # Backup of previous version
 ├── README.md              # This file
 ├── .gitignore            # Git ignore configuration
 └── __pycache__/          # Python cache files
