@@ -2,6 +2,8 @@ import os
 import logging
 import datetime
 import subprocess
+import csv
+import json
 
 # Define a logging function to log messages to a file
 def setup_logging(log_dir="logs", log_name="Std_logName"):
@@ -38,3 +40,32 @@ def execute_cmd(thecmd):
     except FileNotFoundError:
         logging.error("Error: Command not found. Ensure it's installed and in your PATH.")
         return None
+
+def export_to_csv(data, filename, fieldnames):
+    """
+    Exports a list of dictionaries to a CSV file.
+    """
+    try:
+        with open(filename, mode='w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=';')
+            writer.writeheader()
+            for row in data:
+                writer.writerow(row)
+        logging.info(f"Successfully exported data to CSV: {filename}")
+        return True
+    except Exception as e:
+        logging.error(f"Failed to export data to CSV {filename}: {e}")
+        return False
+
+def export_to_json(data, filename):
+    """
+    Exports data to a JSON file.
+    """
+    try:
+        with open(filename, mode='w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+        logging.info(f"Successfully exported data to JSON: {filename}")
+        return True
+    except Exception as e:
+        logging.error(f"Failed to export data to JSON {filename}: {e}")
+        return False

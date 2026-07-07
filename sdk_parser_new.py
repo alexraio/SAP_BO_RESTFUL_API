@@ -1,16 +1,17 @@
 '''
 ------------------------------------------------------
 
-NAME:        
+NAME:        sdk_parser.py
 DESCRIPTION: Class to manage the connection to the Business Objects platform and perform operations on Webi documents.
 AUTHOR:      Ballarin, Alessio
-VERSION:     0.1
+VERSION:     0.2
 CREATED ON:  
-CHANGED AT:  
-CHANGES:     
+CHANGED AT:  2026-07-01
+CHANGES:
 0.1 -  - Initial version - Alessio Ballarin
-0.2 - 29/06/2026 - Added support to retrieve core universe IDs from 
-               webi documents - Alessio Ballarin
+0.2 - 2026-07-01 - Unified and refactored version in root directory - Alessio Ballarin
+0.3 - 2026-07-03 - Added methods to retrieve all Webi documents and export them to CSV and JSON - Alessio Ballarin
+0.4 - 2026-07-03 - Added setup_logging static method wrapping rest_helper.setup_logging for file-based logging - Alessio Ballarin
 
 ------------------------------------------------------
 '''
@@ -21,6 +22,8 @@ import logging
 import os
 import re
 import datetime
+
+from rest_helper import setup_logging as _setup_logging
 
 
 class BOESDKParser:
@@ -49,7 +52,7 @@ class BOESDKParser:
         >>> print(universes)
     """
 
-    def __init__(self, protocol='http', host='ora-rhel-01.pf.box', 
+    def __init__(self, protocol='http', host='ora-rhel-01.pf.box',
                  port='8080', content_type='application/json'):
         """
         Initializes the BOESDKParser with server details and creates a session.
@@ -65,6 +68,26 @@ class BOESDKParser:
         }
         self.session = requests.Session()
         self.logon_token = None
+
+    @staticmethod
+    def setup_logging(log_dir="logs", log_name="BOESDKParser"):
+        """
+        Configures file-based logging for the BOESDKParser class.
+
+        Thin wrapper around rest_helper.setup_logging so callers can invoke
+        ``BOESDKParser.setup_logging(...)`` instead of importing rest_helper
+        directly. Call this once at the top of your script (before or after
+        instantiating the parser) so the existing ``logging.info/debug/error``
+        calls inside this module have a configured handler to write to.
+
+        Args:
+            log_dir (str): Directory to write the log file into (default: 'logs').
+            log_name (str): Base name for the log file (default: 'BOESDKParser').
+
+        Returns:
+            str: Path to the created log file.
+        """
+        return _setup_logging(log_dir=log_dir, log_name=log_name)
 
     def _get_auth_info(self):
         """
@@ -347,12 +370,21 @@ class BOESDKParser:
         """
         url = f"{self.webi_url}/documents/{webi_doc_id}/dataproviders"
         try:
+            logging.debug(f"Requesting URL: {url}")
+            logging.debug(f"Headers: {self.headers}")
             resp = self.session.get(url, headers=self.headers, verify=False)
+            logging.debug(f"Response Status: {resp.status_code}, Content-Length: {len(resp.text)}")
+            if resp.status_code != 200:
+                logging.error(f"Error getting Data Providers for document {webi_doc_id}: HTTP {resp.status_code}")
+                logging.error(f"Response Body: {resp.text}")
             resp.raise_for_status()
             j_response = resp.json()
             return [dp['id'] for dp in j_response['dataproviders']['dataprovider']]
         except requests.exceptions.RequestException as e:
-            print(f"Error getting Data Providers: {e}")
+            logging.error(f"Error getting Data Providers for document {webi_doc_id}: {e}")
+            return []
+        except Exception as e:
+            logging.error(f"Unexpected error getting Data Providers for document {webi_doc_id}: {e}")
             return []
     
     def get_dp_details(self, webi_doc_id, dp_id):
@@ -372,6 +404,8 @@ class BOESDKParser:
         url = f"{self.webi_url}/documents/{webi_doc_id}/dataproviders/{dp_id}"
         try:
             resp = self.session.get(url, headers=self.headers, verify=False)
+            if resp.status_code != 200:
+                logging.error(f"Error getting DP details for {dp_id} in document {webi_doc_id}: HTTP {resp.status_code} - {resp.text}")
             resp.raise_for_status()
             j_response = resp.json()
             dp_data = j_response['dataprovider']
@@ -393,7 +427,10 @@ class BOESDKParser:
                 'expressions': expressions
             }
         except requests.exceptions.RequestException as e:
-            print(f"Error getting Data Provider details: {e}")
+            logging.error(f"Error getting DP details for {dp_id} in document {webi_doc_id}: {e}")
+            return None
+        except Exception as e:
+            logging.error(f"Unexpected error getting DP details for {dp_id} in document {webi_doc_id}: {e}")
             return None
 
     def purge_dp(self, webi_doc_id, dp_id):
@@ -445,7 +482,7 @@ class BOESDKParser:
 
         Args:
             webi_doc_id (str): ID of the Webi document. 
-
+        
         Returns:
             dict: A dictionary containing document details.
                   Returns None if there's an error.
@@ -552,3 +589,34 @@ class BOESDKParser:
         else:
             raise Exception(f"CMS query failed: {resp.status_code} - {resp.text}")
 
+    def get_all_webi_documents(self):
+        """
+        Retrieves all Webi documents by querying the CMS and handling pagination.
+
+        Returns:
+            list: A list of dictionaries, each containing 'id' and 'name' of a Webi document.
+        """
+        url = f"{self.query_url}/cmsquery?page=1&pagesize=500000"
+        payload = {
+            "query": "SELECT SI_ID, SI_NAME FROM CI_INFOOBJECTS WHERE SI_KIND = 'Webi' AND SI_INSTANCE = 0"
+        }
+        all_reports = []
+        
+        while url:
+            resp = self.session.post(url, json=payload, headers=self.headers, verify=False)
+            if resp.status_code == 200:
+                j_resp = resp.json()
+                for entry in j_resp.get('entries', []):
+                    all_reports.append({'id': entry['SI_ID'], 'name': entry['SI_NAME']})
+                
+                # Check for pagination
+                next_page = j_resp.get('next', {}).get('__deferred', {}).get('uri')
+                logging.info(f"Next Webi documents page URL: {next_page}")
+                if next_page:
+                    url = next_page
+                else:
+                    url = None
+            else:
+                raise Exception(f"CMS query failed: {resp.status_code} - {resp.text}")
+                
+        return all_reports
